@@ -93,7 +93,7 @@ class NeumannInverseHessianApproximationEngine:
                 "" % (len(list(diff)), len(list(v)), len(list(w)))
             )
             v = [ve - alpha * ge for ve, ge in zip(v, diff)]
-            p = [pe - ve for pe, ve in zip(p, v)]
+            p = [pe + ve for pe, ve in zip(p, v)]
         return p
 
     def implicit_grad(
