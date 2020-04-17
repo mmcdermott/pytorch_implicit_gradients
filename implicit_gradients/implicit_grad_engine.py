@@ -1,66 +1,67 @@
 import torch
 
-class IterativeConjugateGradientEngine:
-    """
-    https://arxiv.org/pdf/1909.04630.pdf
-    Inspired by https://github.com/sungyubkim/GBML/blob/master/gbml/imaml.py
-
-    Only works to compute \partial LV / \parital \phi^{(0)}, where LV is validation
-    loss under optimal parameters \phi^* computed via SGD with proximal regularization
-    on loss LT with weighting $\lambda$.
-    """
-    def __init__(self, proximal_regularization_strength):
-        self.pr_lambda = proximal_regularization_strength
-
-    @torch.no_grad()
-    def cg(self, in_grad, outer_grad, params):
-        x = outer_grad.clone().detach()
-        r = outer_grad.clone().detach() - self.hv_prod(in_grad, x, params)
-        p = r.clone().detach()
-        for i in range(self.n_cg):
-            Ap = self.hv_prod(in_grad, p, params)
-            alpha = (r @ r)/(p @ Ap)
-            x = x + alpha * p
-            r_new = r - alpha * Ap
-            beta = (r_new @ r_new)/(r @ r)
-            p = r_new + beta * p
-            r = r_new.clone().detach()
-        return self.vec_to_grad(x, params)
-
-    # TODO(mmd): Port this logic over to all algorithms.
-    def vec_to_grad(self, vec, params):
-        pointer = 0
-        res = []
-        for param in params:
-            num_param = param.numel()
-            res.append(vec[pointer:pointer+num_param].view_as(param).data)
-            pointer += num_param
-        return res
-
-    @torch.enable_grad()
-    def hv_prod(self, in_grad, x, params):
-        hv = torch.autograd.grad(in_grad, params, retain_graph=True, grad_outputs=x)
-        hv = torch.nn.utils.parameters_to_vector(hv).detach()
-        # precondition with identity matrix
-        return hv/self.pr_lambda + x
-
-
-    def implicit_grad(
-        val_grad, train_loss, train_params, meta_params = None, learning_rate = None,
-        direct_val_meta_grad = None,
-    ):
-        if meta_params is not None:
-            assert len(list(train_params)) == len(list(meta_params))
-            print(
-                "Meta parameters not actually needed for this algorithm, "
-                "as they should be the initialization of the `train_params`."
-            )
-
-        train_grad = torch.nn.utils.parameters_to_vector(
-            torch.autograd.grad(train_loss, train_params, create_graph=True)
-        )
-        implicit_grad = self.cg(train_grad, val_grad, train_params)
-        return implicit_grad
+# This is yet untested, so commenting out for now.
+# class IterativeConjugateGradientEngine:
+#     """
+#     https://arxiv.org/pdf/1909.04630.pdf
+#     Inspired by https://github.com/sungyubkim/GBML/blob/master/gbml/imaml.py
+# 
+#     Only works to compute \partial LV / \parital \phi^{(0)}, where LV is validation
+#     loss under optimal parameters \phi^* computed via SGD with proximal regularization
+#     on loss LT with weighting $\lambda$.
+#     """
+#     def __init__(self, proximal_regularization_strength):
+#         self.pr_lambda = proximal_regularization_strength
+# 
+#     @torch.no_grad()
+#     def cg(self, in_grad, outer_grad, params):
+#         x = outer_grad.clone().detach()
+#         r = outer_grad.clone().detach() - self.hv_prod(in_grad, x, params)
+#         p = r.clone().detach()
+#         for i in range(self.n_cg):
+#             Ap = self.hv_prod(in_grad, p, params)
+#             alpha = (r @ r)/(p @ Ap)
+#             x = x + alpha * p
+#             r_new = r - alpha * Ap
+#             beta = (r_new @ r_new)/(r @ r)
+#             p = r_new + beta * p
+#             r = r_new.clone().detach()
+#         return self.vec_to_grad(x, params)
+# 
+#     # TODO(mmd): Port this logic over to all algorithms.
+#     def vec_to_grad(self, vec, params):
+#         pointer = 0
+#         res = []
+#         for param in params:
+#             num_param = param.numel()
+#             res.append(vec[pointer:pointer+num_param].view_as(param).data)
+#             pointer += num_param
+#         return res
+# 
+#     @torch.enable_grad()
+#     def hv_prod(self, in_grad, x, params):
+#         hv = torch.autograd.grad(in_grad, params, retain_graph=True, grad_outputs=x)
+#         hv = torch.nn.utils.parameters_to_vector(hv).detach()
+#         # precondition with identity matrix
+#         return hv/self.pr_lambda + x
+# 
+# 
+#     def implicit_grad(
+#         val_grad, train_loss, train_params, meta_params = None, learning_rate = None,
+#         direct_val_meta_grad = None,
+#     ):
+#         if meta_params is not None:
+#             assert len(list(train_params)) == len(list(meta_params))
+#             print(
+#                 "Meta parameters not actually needed for this algorithm, "
+#                 "as they should be the initialization of the `train_params`."
+#             )
+# 
+#         train_grad = torch.nn.utils.parameters_to_vector(
+#             torch.autograd.grad(train_loss, train_params, create_graph=True)
+#         )
+#         implicit_grad = self.cg(train_grad, val_grad, train_params)
+#         return implicit_grad
 
 class NeumannInverseHessianApproximationEngine:
     """
